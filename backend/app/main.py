@@ -63,7 +63,7 @@ app.include_router(orders.router, prefix=settings.API_V1_STR)
 app.include_router(documents.router, prefix=settings.API_V1_STR)
 app.include_router(notifications.router, prefix=settings.API_V1_STR)
 app.include_router(logs.router, prefix=settings.API_V1_STR)
-app.include_router(support.router, prefix=settings.API_V1_STR) # Вот сюда его нужно было добавить
+app.include_router(support.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():

@@ -4,8 +4,8 @@ from typing import List
 from pydantic import BaseModel
 from datetime import datetime
 from app.core.database import get_db
-from app.core.security import get_current_active_user
-from app.models.user import User
+from app.core.security import get_current_active_user, get_current_admin_user
+from app.models.user import User, UserRole
 from app.models.notification import Notification
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -71,12 +71,10 @@ def mark_as_read(
     return {"message": "Marked as read"}
 
 
-from app.models.user import User, UserRole
-
 @router.post("/admin")
 def notify_admins(
     data: NotificationCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     admins = db.query(User).filter(User.role == UserRole.ADMIN).all()

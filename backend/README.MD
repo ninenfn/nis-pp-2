@@ -8,7 +8,7 @@
 - **База данных:** PostgreSQL
 - **ORM:** SQLAlchemy
 - **Файловое хранилище:** MinIO S3-совместимое
-- **Аутентификация:** JWT, bcrypt
+- **Аутентификация:** JWT, хеширование паролей SHA-256-crypt (passlib, схема `sha256_crypt`)
 - **Инфраструктура:** Docker, Docker Compose
 
 ## Функциональные требования
@@ -41,33 +41,37 @@
 ## Структура проекта
 
 ```text
-air_bag_service/
-├── backend/                    # FastAPI бекенд
-│   ├── app/
-│   │   ├── api/v1/            # REST эндпоинты
-│   │   │   ├── auth.py        # Аутентификация
-│   │   │   ├── users.py       # Управление пользователями
-│   │   │   ├── orders.py      # CRUD заказов
-│   │   │   ├── documents.py   # Загрузка/скачивание файлов
-│   │   │   ├── notifications.py # Уведомления
-│   │   │   ├── logs.py        # Логи системы
-│   │   │   └── support.py     # Чат поддержки, тикеты
-│   │   ├── core/              # Конфигурация, безопасность, БД
-│   │   ├── models/            # SQLAlchemy модели
-│   │   ├── schemas/           # Pydantic схемы
-│   │   ├── services/          # Бизнес-логика
-│   │   └── tests/             # Unit-тесты
-│   ├── requirements.txt
-│   └── Dockerfile
-└── docker-compose.yml          # PostgreSQL + MinIO + Backend
+nis-pp-2/
+├── .gitignore
+└── backend/                    # FastAPI бекенд
+    ├── app/
+    │   ├── api/v1/            # REST эндпоинты
+    │   │   ├── auth.py        # Аутентификация
+    │   │   ├── users.py       # Управление пользователями
+    │   │   ├── orders.py      # CRUD заказов
+    │   │   ├── documents.py   # Загрузка/скачивание файлов
+    │   │   ├── notifications.py # Уведомления
+    │   │   ├── logs.py        # Логи системы
+    │   │   └── support.py     # Чат поддержки, тикеты
+    │   ├── core/              # Конфигурация, безопасность, БД
+    │   ├── models/            # SQLAlchemy модели
+    │   ├── schemas/           # Pydantic схемы
+    │   ├── services/          # Бизнес-логика
+    │   ├── tests/             # Unit-тесты
+    │   └── .env.example       # Пример переменных окружения
+    ├── requirements.txt
+    ├── Dockerfile
+    └── docker-compose.yml     # PostgreSQL + MinIO + Backend
 ```
 
 ## Запуск
 **Через Docker**
 ```bash
-cd air_bag_service
-docker-compose up --build -d
+cd backend
+docker compose up --build -d
 ```
+
+Для локального запуска без Docker скопируйте `app/.env.example` в `app/.env` и при необходимости измените значения. Файл `.env` в репозиторий не коммитится.
 
 После запуска сервисы будут доступны по адресам:
 

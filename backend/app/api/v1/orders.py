@@ -12,6 +12,8 @@ from app.services.logger import log_action
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
+COURIER_STATUSES = {OrderStatus.BAGGAGE_RECEIVED, OrderStatus.IN_TRANSIT, OrderStatus.DELIVERED}
+
 
 @router.post("/", response_model=OrderResponse, status_code=201)
 def create_order(
@@ -101,20 +103,40 @@ def update_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if current_user.role == UserRole.CLIENT and order.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == UserRole.CLIENT:
+        # Клиент: только свой заказ, только оплата и адрес доставки
+        if order.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if order_update.status is not None or order_update.courier_id is not None:
+            raise HTTPException(status_code=403, detail="Client cannot change status or courier")
+    elif current_user.role == UserRole.COURIER:
+        # Курьер: только назначенный ему заказ и только статус доставки
+        if order.courier_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if (order_update.courier_id is not None
+                or order_update.payment_status is not None
+                or order_update.delivery_address is not None):
+            raise HTTPException(status_code=403, detail="Courier can change only order status")
+        if order_update.status is not None and order_update.status not in COURIER_STATUSES:
+            raise HTTPException(status_code=403, detail="Courier cannot set this status")
     
     old_status = order.status
     
     # При оплате автоматически переводим в ожидание курьера
     if order_update.payment_status == PaymentStatus.PAID:
+        if order.payment_status != PaymentStatus.PENDING or order.status != OrderStatus.CREATED:
+            raise HTTPException(status_code=400, detail="Order cannot be paid in current status")
         order.payment_status = PaymentStatus.PAID
         order.status = OrderStatus.AWAITING_COURIER
+        log_action(db, "INFO", f"Заказ #{order.id} оплачен", current_user.id)
     
     # При назначении курьера проверяем оплату
     if order_update.courier_id is not None:
         if order.payment_status != PaymentStatus.PAID:
             raise HTTPException(status_code=400, detail="Cannot assign courier to unpaid order")
+        courier = db.query(User).filter(User.id == order_update.courier_id).first()
+        if not courier or courier.role != UserRole.COURIER or not courier.is_active:
+            raise HTTPException(status_code=400, detail="User is not an active courier")
         order.courier_id = order_update.courier_id
         # Уведомление курьеру
         send_notification(db, order_update.courier_id, f"Вас назначили на заказ #{order.id}")
@@ -141,12 +163,10 @@ def update_order(
         admins = db.query(User).filter(User.role == UserRole.ADMIN).all()
         for admin in admins:
             send_notification(db, admin.id, f"Заказ #{order.id}: {status_text}")
-            log_action(db, "INFO", f"Заказ #{order.id} оплачен", current_user.id)
-            
             
     if order_update.delivery_address is not None:
         order.delivery_address = order_update.delivery_address
-        log_action(db, "INFO", f"Заказ #{order.id} доставлен", current_user.id)
+        log_action(db, "INFO", f"Адрес доставки заказа #{order.id} изменён", current_user.id)
     
     db.commit()
     db.refresh(order)
@@ -174,14 +194,20 @@ def cancel_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
+    if current_user.role == UserRole.COURIER:
+        raise HTTPException(status_code=403, detail="Courier cannot cancel orders")
     if current_user.role == UserRole.CLIENT and order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    if order.status == OrderStatus.DELIVERED:
-        raise HTTPException(status_code=400, detail="Cannot cancel delivered order")
+    if order.status in (OrderStatus.DELIVERED, OrderStatus.CANCELLED):
+        raise HTTPException(status_code=400, detail="Cannot cancel completed order")
+    # Клиент может отменить заказ только до оплаты
+    if current_user.role == UserRole.CLIENT and order.payment_status != PaymentStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Cannot cancel paid order")
     
     order.status = OrderStatus.CANCELLED
     db.commit()
+    log_action(db, "INFO", f"Заказ #{order.id} отменён", current_user.id)
     
     history = StatusHistory(
         order_id=order.id,
@@ -206,6 +232,8 @@ def get_order_history(
         raise HTTPException(status_code=404, detail="Order not found")
     
     if current_user.role == UserRole.CLIENT and order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == UserRole.COURIER and order.courier_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     return order.status_history

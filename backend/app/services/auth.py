@@ -2,13 +2,19 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from typing import Optional
 
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 class AuthService:
     @staticmethod
     def register_user(db: Session, user_data: UserCreate) -> User:
+        if user_data.role != UserRole.CLIENT:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Self-registration is allowed only for clients"
+            )
+
         existing_user = db.query(User).filter(User.email == user_data.email).first()
         if existing_user:
             raise HTTPException(
@@ -21,7 +27,7 @@ class AuthService:
             password_hash=get_password_hash(user_data.password),
             full_name=user_data.full_name,
             phone_number=user_data.phone_number,
-            role=user_data.role
+            role=UserRole.CLIENT
         )
         
         db.add(user)

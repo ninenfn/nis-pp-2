@@ -41,7 +41,7 @@ def get_tickets(current_user: User = Depends(get_current_active_user), db: Sessi
             "messages": t.messages,
             "messages_count": len(t.messages),
             "last_message": last_msg.text if last_msg else "Нет сообщений",
-            "last_sender_id": last_msg.sender_id if last_msg else None # <--- ДОБАВИТЬ ЭТО
+            "last_sender_id": last_msg.sender_id if last_msg else None
         }
         result.append(t_dict)
     return result

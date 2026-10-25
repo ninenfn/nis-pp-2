@@ -26,8 +26,10 @@ def get_upload_url(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    # Только владелец заказа может загружать документы
+    # Загружать документы могут владелец заказа, назначенный курьер или админ
     if current_user.role == UserRole.CLIENT and order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == UserRole.COURIER and order.courier_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     upload_url, file_key = storage.generate_upload_url(file_name, mime_type)
@@ -119,6 +121,8 @@ def delete_document(
     order = db.query(Order).filter(Order.id == order_id).first()
     
     # Только владелец или админ может удалять
+    if current_user.role == UserRole.COURIER:
+        raise HTTPException(status_code=403, detail="Access denied")
     if current_user.role == UserRole.CLIENT and order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     

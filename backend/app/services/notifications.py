@@ -1,12 +1,3 @@
-import logging
-
-logger = logging.getLogger(__name__)
-
-def send_notification(user_email: str, message: str):
-    """Заглушка уведомлений — пишет в лог"""
-    logger.info(f"📧 NOTIFICATION to {user_email}: {message}")
-    print(f"📧 [NOTIFICATION] To: {user_email} | {message}")
-    
 from sqlalchemy.orm import Session
 from app.models.notification import Notification
 
